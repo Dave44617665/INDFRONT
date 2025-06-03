@@ -9,6 +9,7 @@ import SubjectsScreen from '../screens/SubjectsScreen';
 import SubjectTasksScreen from '../screens/SubjectTasksScreen';
 import TasksScreen from '../screens/TasksScreen';
 import TaskDetailsScreen from '../screens/TaskDetailsScreen';
+import CreateTaskScreen from '../screens/CreateTaskScreen';
 import GroupsScreen from '../screens/GroupsScreen';
 import GroupSearchScreen from '../screens/GroupSearchScreen';
 import CreateGroupScreen from '../screens/CreateGroupScreen';
@@ -79,6 +80,11 @@ const TasksStack = () => (
           </TouchableOpacity>
         ),
       }} 
+    />
+    <Stack.Screen 
+      name="CreateTask" 
+      component={CreateTaskScreen} 
+      options={{ title: 'Create Task' }} 
     />
   </Stack.Navigator>
 );

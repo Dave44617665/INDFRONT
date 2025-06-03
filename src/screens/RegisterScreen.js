@@ -1,17 +1,101 @@
 import React from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import axios from 'axios';
+
+// API endpoint
+const API_URL = 'https://4edu.su';
 
 const RegisterScreen = ({ navigation }) => {
-  const [name, setName] = React.useState('');
+  const [username, setUsername] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
   const [showPassword, setShowPassword] = React.useState(false);
-  const [academicGroup, setAcademicGroup] = React.useState('');
+  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
 
-  const handleRegister = () => {
-    // Implement registration logic
+  const validatePasswords = () => {
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match');
+      return false;
+    }
+    if (password.length < 6) {
+      Alert.alert('Error', 'Password must be at least 6 characters long');
+      return false;
+    }
+    return true;
+  };
+
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const handleRegister = async () => {
+    if (!validatePasswords()) {
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+
+    try {
+      console.log('Sending registration request with:', {
+        username,
+        email,
+        password: password.length // Just log length for security
+      });
+
+      const requestData = {
+        username: username.trim(),
+        email: email.trim().toLowerCase(),
+        password: password
+      };
+
+      const config = {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      };
+
+      const response = await axios.post(
+        `${API_URL}/register`,
+        requestData,
+        config
+      );
+
+      console.log('Registration response:', response.status);
+
+      if (response.data) {
+        Alert.alert('Success', 'Registration successful!', [
+          {
+            text: 'OK',
+            onPress: () => navigation.navigate('Login')
+          }
+        ]);
+      }
+    } catch (error) {
+      console.error('Registration error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        headers: error.response?.headers
+      });
+
+      let errorMessage = 'Registration failed. ';
+      if (error.response?.data?.message) {
+        errorMessage += error.response.data.message;
+      } else if (error.response?.status === 400) {
+        errorMessage += 'Please check your input and try again.';
+      } else {
+        errorMessage += 'Please try again later.';
+      }
+
+      Alert.alert('Registration Failed', errorMessage);
+    }
   };
 
   return (
@@ -25,12 +109,13 @@ const RegisterScreen = ({ navigation }) => {
 
       <View style={styles.form}>
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Full Name</Text>
+          <Text style={styles.label}>Username</Text>
           <TextInput
             style={styles.input}
-            value={name}
-            onChangeText={setName}
-            placeholder="Enter your full name"
+            value={username}
+            onChangeText={setUsername}
+            placeholder="Enter your username"
+            autoCapitalize="none"
           />
         </View>
 
@@ -55,6 +140,7 @@ const RegisterScreen = ({ navigation }) => {
               onChangeText={setPassword}
               placeholder="Create a password"
               secureTextEntry={!showPassword}
+              autoCapitalize="none"
             />
             <TouchableOpacity
               style={styles.passwordToggle}
@@ -71,43 +157,45 @@ const RegisterScreen = ({ navigation }) => {
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Confirm Password</Text>
-          <TextInput
-            style={styles.input}
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            placeholder="Confirm your password"
-            secureTextEntry={!showPassword}
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Academic Group</Text>
-          <TextInput
-            style={styles.input}
-            value={academicGroup}
-            onChangeText={setAcademicGroup}
-            placeholder="Enter your academic group"
-          />
+          <View style={styles.passwordContainer}>
+            <TextInput
+              style={[styles.input, styles.passwordInput]}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              placeholder="Confirm your password"
+              secureTextEntry={!showConfirmPassword}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity
+              style={styles.passwordToggle}
+              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+            >
+              <Ionicons
+                name={showConfirmPassword ? 'eye-off' : 'eye'}
+                size={20}
+                color="#71727A"
+              />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <TouchableOpacity
           style={[
             styles.registerButton,
-            (!name || !email || !password || !confirmPassword || !academicGroup) &&
-              styles.registerButtonDisabled,
+            (!username || !email || !password || !confirmPassword) && styles.registerButtonDisabled,
           ]}
           onPress={handleRegister}
-          disabled={
-            !name || !email || !password || !confirmPassword || !academicGroup
-          }
+          disabled={!username || !email || !password || !confirmPassword}
         >
-          <Text style={styles.registerButtonText}>Create Account</Text>
+          <Text style={styles.registerButtonText}>Register</Text>
         </TouchableOpacity>
 
         <View style={styles.loginPrompt}>
           <Text style={styles.loginText}>Already have an account? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-            <Text style={styles.loginLink}>Log In</Text>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Login')}
+          >
+            <Text style={styles.loginLinkText}>Login</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -193,7 +281,7 @@ const styles = StyleSheet.create({
     color: '#71727A',
     fontSize: 14,
   },
-  loginLink: {
+  loginLinkText: {
     color: '#4B6BFB',
     fontSize: 14,
     fontWeight: '500',

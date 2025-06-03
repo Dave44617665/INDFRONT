@@ -56,10 +56,6 @@ const LoginScreen = ({ navigation }) => {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.forgotPassword}>
-          <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-        </TouchableOpacity>
-
         <TouchableOpacity
           style={[
             styles.loginButton,
@@ -77,14 +73,6 @@ const LoginScreen = ({ navigation }) => {
             <Text style={styles.registerLink}>Register</Text>
           </TouchableOpacity>
         </View>
-
-        <TouchableOpacity 
-          style={styles.searchButton}
-          onPress={() => navigation.navigate('GroupSearch')}
-        >
-          <Ionicons name="search" size={20} color="#71727A" />
-          <Text style={styles.searchButtonText}>Search New Groups</Text>
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -143,15 +131,6 @@ const styles = StyleSheet.create({
     top: 12,
     padding: 4,
   },
-  forgotPassword: {
-    alignSelf: 'flex-end',
-    marginBottom: 24,
-  },
-  forgotPasswordText: {
-    color: '#4B6BFB',
-    fontSize: 14,
-    fontWeight: '500',
-  },
   loginButton: {
     backgroundColor: '#4B6BFB',
     borderRadius: 12,
@@ -179,20 +158,6 @@ const styles = StyleSheet.create({
     color: '#4B6BFB',
     fontSize: 14,
     fontWeight: '500',
-  },
-  searchButton: {
-    backgroundColor: '#4B6BFB',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    flexDirection: 'row',
-    marginTop: 24,
-  },
-  searchButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
   },
 });
 
