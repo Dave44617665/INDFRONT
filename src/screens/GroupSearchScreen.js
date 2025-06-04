@@ -1,62 +1,213 @@
-import React from 'react';
-import { View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  FlatList,
+  Alert,
+  ActivityIndicator,
+  Modal,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import axios from 'axios';
+
+const API_URL = 'https://4edu.su/api';
+const PAGE_SIZE = 10;
 
 const GroupSearchScreen = ({ navigation }) => {
-  const [searchQuery, setSearchQuery] = React.useState('');
-  const [searchResults, setSearchResults] = React.useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [groups, setGroups] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [joinMessage, setJoinMessage] = useState('');
+  const [isModalVisible, setIsModalVisible] = useState(false);
 
-  const handleSearch = (query) => {
-    setSearchQuery(query);
-    // Implement search logic here
+  const fetchGroups = async (page = 1, search = '') => {
+    setIsLoading(true);
+    try {
+      const params = {
+        page,
+        page_size: PAGE_SIZE,
+      };
+      if (search) {
+        params.search = search;
+      }
+
+      const response = await axios.get(`${API_URL}/groups/available`, { params });
+      setGroups(response.data.groups);
+      setTotalPages(response.data.pagination.pages);
+      setCurrentPage(response.data.pagination.page);
+    } catch (error) {
+      console.error('Error fetching groups:', error);
+      Alert.alert('Error', 'Failed to load available groups');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const renderGroup = ({ item }) => (
-    <TouchableOpacity style={styles.groupCard}>
-      <View style={[styles.groupIcon, { backgroundColor: item.iconBg }]}>
-        <Ionicons name={item.icon || 'people'} size={24} color="#FFF" />
-      </View>
+  useEffect(() => {
+    fetchGroups();
+  }, []);
+
+  const handleSearch = () => {
+    setCurrentPage(1);
+    fetchGroups(1, searchQuery);
+  };
+
+  const handleLoadMore = () => {
+    if (currentPage < totalPages && !isLoading) {
+      fetchGroups(currentPage + 1, searchQuery);
+    }
+  };
+
+  const handleJoinRequest = async () => {
+    if (!selectedGroup || !joinMessage.trim()) {
+      Alert.alert('Error', 'Please enter a message');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await axios.post(`${API_URL}/groups/applications`, {
+        group_id: selectedGroup.id,
+        message: joinMessage.trim()
+      });
+
+      Alert.alert('Success', 'Application sent successfully');
+      setIsModalVisible(false);
+      setJoinMessage('');
+      setSelectedGroup(null);
+    } catch (error) {
+      console.error('Error sending application:', error);
+      Alert.alert('Error', error.response?.data?.message || 'Failed to send application');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const renderGroupItem = ({ item }) => (
+    <View style={styles.groupCard}>
       <View style={styles.groupInfo}>
         <Text style={styles.groupName}>{item.name}</Text>
-        <Text style={styles.groupDescription}>{item.description}</Text>
-        <View style={styles.groupMeta}>
-          <View style={styles.metaItem}>
-            <Ionicons name="people-outline" size={16} color="#71727A" />
-            <Text style={styles.metaText}>{item.memberCount} members</Text>
-          </View>
-        </View>
+        <Text style={styles.groupDetails}>
+          Admin: {item.admin_username}
+        </Text>
+        <Text style={styles.groupDetails}>
+          Academic Group: {item.academic_group_name}
+        </Text>
       </View>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.joinButton}
         onPress={() => {
-          // Handle join group
+          setSelectedGroup(item);
+          setIsModalVisible(true);
         }}
       >
         <Text style={styles.joinButtonText}>Join</Text>
       </TouchableOpacity>
-    </TouchableOpacity>
+    </View>
   );
 
   return (
     <View style={styles.container}>
       <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#71727A" />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search groups..."
           value={searchQuery}
-          onChangeText={handleSearch}
-          autoFocus
+          onChangeText={setSearchQuery}
+          placeholder="Search groups by name"
+          returnKeyType="search"
+          onSubmitEditing={handleSearch}
         />
+        <TouchableOpacity 
+          style={styles.searchButton}
+          onPress={handleSearch}
+        >
+          <Ionicons name="search" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
       </View>
 
       <FlatList
-        data={searchResults}
-        renderItem={renderGroup}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
+        data={groups}
+        renderItem={renderGroupItem}
+        keyExtractor={item => item.id.toString()}
+        contentContainerStyle={styles.listContent}
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.1}
+        ListEmptyComponent={
+          !isLoading && (
+            <Text style={styles.emptyText}>No groups found</Text>
+          )
+        }
+        ListFooterComponent={
+          isLoading && (
+            <ActivityIndicator 
+              size="large" 
+              color="#4B6BFB" 
+              style={styles.loader} 
+            />
+          )
+        }
       />
+
+      <Modal
+        visible={isModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Join Request</Text>
+            <Text style={styles.modalSubtitle}>
+              Group: {selectedGroup?.name}
+            </Text>
+            
+            <TextInput
+              style={styles.messageInput}
+              value={joinMessage}
+              onChangeText={setJoinMessage}
+              placeholder="Enter your join request message"
+              multiline
+              numberOfLines={4}
+              maxLength={200}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setIsModalVisible(false);
+                  setJoinMessage('');
+                  setSelectedGroup(null);
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.modalButton, 
+                  styles.sendButton,
+                  !joinMessage.trim() && styles.sendButtonDisabled
+                ]}
+                onPress={handleJoinRequest}
+                disabled={!joinMessage.trim() || isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.sendButtonText}>Send Request</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -68,80 +219,134 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    margin: 16,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
+    padding: 16,
+    gap: 12,
   },
   searchInput: {
     flex: 1,
-    marginLeft: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    borderRadius: 12,
+    padding: 12,
     fontSize: 16,
-    color: '#1A1C1E',
   },
-  listContainer: {
+  searchButton: {
+    backgroundColor: '#4B6BFB',
+    borderRadius: 12,
+    width: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  listContent: {
     padding: 16,
   },
   groupCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  groupIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginRight: 16,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
   },
   groupInfo: {
     flex: 1,
   },
   groupName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: '#1A1C1E',
     marginBottom: 4,
   },
-  groupDescription: {
+  groupDetails: {
     fontSize: 14,
     color: '#71727A',
-    marginBottom: 8,
-  },
-  groupMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  metaText: {
-    marginLeft: 4,
-    fontSize: 12,
-    color: '#71727A',
+    marginBottom: 2,
   },
   joinButton: {
     backgroundColor: '#4B6BFB20',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
-    marginLeft: 12,
   },
   joinButtonText: {
     color: '#4B6BFB',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: '#71727A',
+    fontSize: 16,
+    marginTop: 32,
+  },
+  loader: {
+    marginVertical: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    width: '90%',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1A1C1E',
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    color: '#71727A',
+    marginBottom: 16,
+  },
+  messageInput: {
+    backgroundColor: '#F8F9FB',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    minHeight: 100,
+    textAlignVertical: 'top',
+    marginBottom: 16,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#FF3B3020',
+  },
+  cancelButtonText: {
+    color: '#FF3B30',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  sendButton: {
+    backgroundColor: '#4B6BFB',
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#4B6BFB80',
+  },
+  sendButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '600',
   },
 });

@@ -1,14 +1,38 @@
 import React from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../context/AuthContext';
 
 const LoginScreen = ({ navigation }) => {
-  const [email, setEmail] = React.useState('');
+  const [username, setUsername] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [showPassword, setShowPassword] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(false);
 
-  const handleLogin = () => {
-    // Implement login logic
+  const { login } = useAuth();
+
+  const handleLogin = async () => {
+    if (!username || !password) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const result = await login(username, password);
+      if (result.success) {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'ProfileMain' }],
+        });
+      } else {
+        Alert.alert('Login Failed', result.error);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -22,14 +46,14 @@ const LoginScreen = ({ navigation }) => {
 
       <View style={styles.form}>
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Email</Text>
+          <Text style={styles.label}>Username</Text>
           <TextInput
             style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Enter your email"
-            keyboardType="email-address"
+            value={username}
+            onChangeText={setUsername}
+            placeholder="Enter your username"
             autoCapitalize="none"
+            editable={!isLoading}
           />
         </View>
 
@@ -42,10 +66,13 @@ const LoginScreen = ({ navigation }) => {
               onChangeText={setPassword}
               placeholder="Enter your password"
               secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              editable={!isLoading}
             />
             <TouchableOpacity
               style={styles.passwordToggle}
               onPress={() => setShowPassword(!showPassword)}
+              disabled={isLoading}
             >
               <Ionicons
                 name={showPassword ? 'eye-off' : 'eye'}
@@ -59,17 +86,24 @@ const LoginScreen = ({ navigation }) => {
         <TouchableOpacity
           style={[
             styles.loginButton,
-            (!email || !password) && styles.loginButtonDisabled,
+            (!username || !password || isLoading) && styles.loginButtonDisabled,
           ]}
           onPress={handleLogin}
-          disabled={!email || !password}
+          disabled={!username || !password || isLoading}
         >
-          <Text style={styles.loginButtonText}>Log In</Text>
+          {isLoading ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.loginButtonText}>Log In</Text>
+          )}
         </TouchableOpacity>
 
         <View style={styles.registerPrompt}>
           <Text style={styles.registerText}>Don't have an account? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('Register')}
+            disabled={isLoading}
+          >
             <Text style={styles.registerLink}>Register</Text>
           </TouchableOpacity>
         </View>

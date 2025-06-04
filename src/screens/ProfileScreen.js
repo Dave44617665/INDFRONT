@@ -1,13 +1,20 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../context/AuthContext';
 
 const ProfileScreen = ({ navigation }) => {
-  // This would come from your authentication context/state
-  const [isAuthenticated, setIsAuthenticated] = React.useState(false);
-  const [user, setUser] = React.useState(null);
+  const { isLoading, userToken, username, logout } = useAuth();
 
-  if (!isAuthenticated) {
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color="#4B6BFB" />
+      </View>
+    );
+  }
+
+  if (!userToken) {
     return (
       <View style={styles.container}>
         <View style={styles.welcomeContainer}>
@@ -38,42 +45,18 @@ const ProfileScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-
       <View style={styles.profileSection}>
-        <View style={styles.avatarContainer}>
-          {user?.avatar ? (
-            <Image source={{ uri: user.avatar }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Ionicons name="person" size={40} color="#FFFFFF" />
-            </View>
-          )}
+        <View style={styles.avatarPlaceholder}>
+          <Ionicons name="person" size={40} color="#FFFFFF" />
         </View>
         <View style={styles.userInfo}>
-          <Text style={styles.userName}>{user?.name || 'User Name'}</Text>
-          <Text style={styles.userEmail}>{user?.email || 'email@example.com'}</Text>
-          <Text style={styles.academicGroup}>{user?.academicGroup || 'Academic Group'}</Text>
-        </View>
-      </View>
-
-      <View style={styles.statsSection}>
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>12</Text>
-          <Text style={styles.statLabel}>Groups</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>48</Text>
-          <Text style={styles.statLabel}>Tasks</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>86%</Text>
-          <Text style={styles.statLabel}>Complete</Text>
+          <Text style={styles.userName}>{username}</Text>
         </View>
       </View>
 
       <TouchableOpacity
         style={styles.logoutButton}
-        onPress={() => setIsAuthenticated(false)}
+        onPress={logout}
       >
         <Ionicons name="log-out-outline" size={24} color="#FF3B30" />
         <Text style={styles.logoutButtonText}>Log Out</Text>
@@ -86,6 +69,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8F9FB',
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   welcomeContainer: {
     flex: 1,
@@ -139,14 +126,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
   },
-  avatarContainer: {
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-  },
   avatarPlaceholder: {
     width: 100,
     height: 100,
@@ -154,44 +133,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#4B6BFB20',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 16,
   },
   userInfo: {
     alignItems: 'center',
   },
   userName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1A1C1E',
-    marginBottom: 4,
-  },
-  userEmail: {
-    fontSize: 16,
-    color: '#71727A',
-    marginBottom: 4,
-  },
-  academicGroup: {
-    fontSize: 14,
-    color: '#71727A',
-  },
-  statsSection: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    marginTop: 12,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statNumber: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#1A1C1E',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#71727A',
   },
   logoutButton: {
     flexDirection: 'row',
