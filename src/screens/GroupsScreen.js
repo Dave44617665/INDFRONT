@@ -1,41 +1,118 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext'; 
+
+const API_URL = 'https://4edu.su/api';
 
 const GroupsScreen = ({ navigation }) => {
-  // This would come from your backend
-  const [groups, setGroups] = React.useState([]);
+  const { userToken } = useAuth();
+  const [groups, setGroups] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    pageSize: 10,
+    hasMore: true
+  });
+
+  const fetchGroups = async (page = 1, refresh = false) => {
+    if (loading || (!pagination.hasMore && !refresh)) return;
+    if (!userToken) {
+      console.log('No auth token available');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Debug log
+      console.log('Fetching groups with token:', userToken);
+      console.log('Request URL:', `${API_URL}/groups/my-groups`);
+      
+      const response = await axios.get(`${API_URL}/groups/my-groups`, {
+        params: {
+          page,
+          page_size: pagination.pageSize
+        }
+      });
+
+      console.log('Response:', response.data);
+
+      const { groups: newGroups, pagination: paginationData } = response.data;
+      
+      setGroups(prevGroups => 
+        refresh ? newGroups : [...prevGroups, ...newGroups]
+      );
+      
+      setPagination({
+        page,
+        pageSize: pagination.pageSize,
+        hasMore: page < paginationData.pages
+      });
+    } catch (error) {
+      console.error('Error fetching groups:', error);
+      console.error('Error details:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        headers: error.response?.headers,
+        config: error.config
+      });
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const handleLoadMore = () => {
+    if (!loading && pagination.hasMore) {
+      fetchGroups(pagination.page + 1);
+    }
+  };
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    setPagination(prev => ({ ...prev, page: 1, hasMore: true }));
+    fetchGroups(1, true);
+  }, []);
 
   React.useEffect(() => {
-    // Fetch groups from backend
+    fetchGroups();
   }, []);
 
   const renderGroup = ({ item }) => (
-    <TouchableOpacity style={styles.groupCard}>
-      <View style={[styles.groupIcon, { backgroundColor: item.iconBg }]}>
-        <Ionicons name={item.icon || 'people'} size={24} color="#FFF" />
+    <TouchableOpacity 
+      style={styles.groupCard}
+      onPress={() => navigation.navigate('GroupDetails', { groupId: item.id })}
+    >
+      <View style={[styles.groupIcon, { backgroundColor: '#4B6BFB' }]}>
+        <Ionicons name="people" size={24} color="#FFF" />
       </View>
       <View style={styles.groupInfo}>
         <Text style={styles.groupName}>{item.name}</Text>
-        <Text style={styles.groupDescription}>{item.description}</Text>
+        <Text style={styles.groupDescription}>Academic Group: {item.academic_group_name}</Text>
         <View style={styles.groupMeta}>
           <View style={styles.metaItem}>
-            <Ionicons name="people-outline" size={16} color="#71727A" />
-            <Text style={styles.metaText}>{item.memberCount} members</Text>
+            <Ionicons name="person-outline" size={16} color="#71727A" />
+            <Text style={styles.metaText}>Admin: {item.admin_username}</Text>
           </View>
-          {item.newMessages > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{item.newMessages} new</Text>
-            </View>
-          )}
         </View>
       </View>
     </TouchableOpacity>
   );
 
+  const renderFooter = () => {
+    if (!loading) return null;
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color="#4B6BFB" />
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
-      
       <TouchableOpacity 
         style={styles.searchButton}
         onPress={() => navigation.navigate('GroupSearch')}
@@ -57,9 +134,21 @@ const GroupsScreen = ({ navigation }) => {
       <FlatList
         data={groups}
         renderItem={renderGroup}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.5}
+        refreshing={refreshing}
+        onRefresh={handleRefresh}
+        ListFooterComponent={renderFooter}
+        ListEmptyComponent={
+          !loading && (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No groups found</Text>
+            </View>
+          )
+        }
       />
     </View>
   );
@@ -158,16 +247,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#71727A',
   },
-  badge: {
-    backgroundColor: '#4B6BFB20',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+  footerLoader: {
+    paddingVertical: 16,
+    alignItems: 'center',
   },
-  badgeText: {
-    fontSize: 12,
-    color: '#4B6BFB',
-    fontWeight: '500',
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#71727A',
   },
 });
 
