@@ -21,11 +21,14 @@ const GroupDetailsScreen = ({ route, navigation }) => {
   const [group, setGroup] = useState(null);
   const [users, setUsers] = useState([]);
   const [subjects, setSubjects] = useState([]);
+  const [tasks, setTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUsersLoading, setIsUsersLoading] = useState(false);
   const [isSubjectsLoading, setIsSubjectsLoading] = useState(false);
+  const [isTasksLoading, setIsTasksLoading] = useState(false);
   const [showUsers, setShowUsers] = useState(false);
   const [showSubjects, setShowSubjects] = useState(false);
+  const [showTasks, setShowTasks] = useState(false);
   const [error, setError] = useState(null);
   const [isUpdateModalVisible, setIsUpdateModalVisible] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
@@ -36,6 +39,12 @@ const GroupDetailsScreen = ({ route, navigation }) => {
     pageSize: 10,
     hasMore: true
   });
+  const [tasksPagination, setTasksPagination] = useState({
+    page: 1,
+    pageSize: 10,
+    hasMore: true
+  });
+  const [hasAttemptedTaskLoad, setHasAttemptedTaskLoad] = useState(false);
 
   const isAdmin = group?.admin_username === username;
 
@@ -123,6 +132,42 @@ const GroupDetailsScreen = ({ route, navigation }) => {
     }
   };
 
+  const fetchTasks = async (page = 1) => {
+    if (isTasksLoading) return;
+    
+    setIsTasksLoading(true);
+    try {
+      const response = await api.get('/api/tasks', {
+        params: {
+          group_id: groupId,
+          page,
+          page_size: tasksPagination.pageSize
+        }
+      });
+      
+      const { tasks: newTasks, pagination } = response.data;
+      
+      if (page === 1) {
+        setTasks(newTasks);
+      } else {
+        setTasks(prev => [...prev, ...newTasks]);
+      }
+      
+      setTasksPagination({
+        page,
+        pageSize: pagination.page_size,
+        hasMore: page < pagination.pages
+      });
+      setHasAttemptedTaskLoad(true);
+    } catch (error) {
+      console.error('Error fetching group tasks:', error);
+      handleError(error, "Failed to load tasks");
+      setHasAttemptedTaskLoad(true);
+    } finally {
+      setIsTasksLoading(false);
+    }
+  };
+
   const handleError = (error, defaultMessage) => {
     const errorMessage = error.response?.status === 403 
       ? "You don't have access to this group"
@@ -153,9 +198,22 @@ const GroupDetailsScreen = ({ route, navigation }) => {
     setShowSubjects(!showSubjects);
   };
 
+  const handleToggleTasks = () => {
+    if (!showTasks && !hasAttemptedTaskLoad) {
+      fetchTasks(1);
+    }
+    setShowTasks(!showTasks);
+  };
+
   const handleLoadMoreSubjects = () => {
     if (subjectsPagination.hasMore) {
       fetchSubjects(subjectsPagination.page + 1);
+    }
+  };
+
+  const handleLoadMoreTasks = () => {
+    if (tasksPagination.hasMore) {
+      fetchTasks(tasksPagination.page + 1);
     }
   };
 
@@ -221,6 +279,37 @@ const GroupDetailsScreen = ({ route, navigation }) => {
       </View>
       <View style={styles.subjectInfo}>
         <Text style={styles.subjectName}>{item.name}</Text>
+      </View>
+    </View>
+  );
+
+  const renderTask = ({ item }) => (
+    <View style={styles.taskCard}>
+      <View style={styles.taskHeader}>
+        <View style={styles.taskIcon}>
+          <Ionicons 
+            name={item.is_verified ? "checkmark-circle" : "time"} 
+            size={20} 
+            color={item.is_verified ? "#4CAF50" : "#FF9800"} 
+          />
+        </View>
+        <View style={styles.taskInfo}>
+          <Text style={styles.taskTitle}>{item.title}</Text>
+          <Text style={styles.taskDeadline}>
+            Due: {new Date(item.deadline).toLocaleDateString()}
+          </Text>
+        </View>
+      </View>
+      {item.description && (
+        <Text style={styles.taskDescription} numberOfLines={2}>
+          {item.description}
+        </Text>
+      )}
+      <View style={styles.taskFooter}>
+        <Text style={styles.taskAuthor}>By: {item.username}</Text>
+        <Text style={styles.taskDate}>
+          Created: {new Date(item.created_at).toLocaleDateString()}
+        </Text>
       </View>
     </View>
   );
@@ -337,6 +426,56 @@ const GroupDetailsScreen = ({ route, navigation }) => {
                   ) : null
                 }
                 onEndReached={handleLoadMoreSubjects}
+                onEndReachedThreshold={0.5}
+              />
+            )}
+          </View>
+        )}
+
+        <TouchableOpacity 
+          style={styles.sectionToggle}
+          onPress={handleToggleTasks}
+        >
+          <View style={styles.sectionToggleHeader}>
+            <Text style={styles.sectionToggleText}>Group Tasks</Text>
+            <Ionicons 
+              name={showTasks ? "chevron-up" : "chevron-down"} 
+              size={24} 
+              color="#4B6BFB" 
+            />
+          </View>
+        </TouchableOpacity>
+
+        {showTasks && (
+          <View style={styles.sectionContent}>
+            {isTasksLoading && !hasAttemptedTaskLoad ? (
+              <ActivityIndicator size="small" color="#4B6BFB" style={styles.sectionLoader} />
+            ) : (
+              <FlatList
+                data={tasks}
+                renderItem={renderTask}
+                keyExtractor={(item) => item.id.toString()}
+                scrollEnabled={false}
+                ListEmptyComponent={
+                  <View style={styles.emptyStateContainer}>
+                    <Ionicons name="clipboard-outline" size={48} color="#71727A" />
+                    <Text style={styles.emptyText}>There are no tasks in this group yet</Text>
+                    {isAdmin && (
+                      <TouchableOpacity
+                        style={styles.createTaskButton}
+                        onPress={() => navigation.navigate('CreateTask', { groupId })}
+                      >
+                        <Text style={styles.createTaskButtonText}>Create Task</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                }
+                ListFooterComponent={
+                  isTasksLoading && hasAttemptedTaskLoad ? (
+                    <ActivityIndicator size="small" color="#4B6BFB" style={styles.footerLoader} />
+                  ) : null
+                }
+                onEndReached={handleLoadMoreTasks}
                 onEndReachedThreshold={0.5}
               />
             )}
@@ -665,6 +804,81 @@ const styles = StyleSheet.create({
   updateButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  taskCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+  },
+  taskHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  taskIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F8F9FB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  taskInfo: {
+    flex: 1,
+  },
+  taskTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A1C1E',
+    marginBottom: 4,
+  },
+  taskDeadline: {
+    fontSize: 14,
+    color: '#FF9800',
+    fontWeight: '500',
+  },
+  taskDescription: {
+    fontSize: 14,
+    color: '#71727A',
+    marginBottom: 12,
+  },
+  taskFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
+  },
+  taskAuthor: {
+    fontSize: 14,
+    color: '#4B6BFB',
+    fontWeight: '500',
+  },
+  taskDate: {
+    fontSize: 14,
+    color: '#71727A',
+  },
+  emptyStateContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  createTaskButton: {
+    backgroundColor: '#4B6BFB',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  createTaskButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: '600',
   },
 });
