@@ -4,7 +4,16 @@ import axios from 'axios';
 
 const AuthContext = createContext(null);
 
-const API_URL = 'https://4edu.su';
+const API_URL = 'https://4edu.su/';
+
+// Create axios instance with default config
+const api = axios.create({
+  baseURL: API_URL,
+  headers: {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json'
+  }
+});
 
 export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
@@ -24,8 +33,8 @@ export const AuthProvider = ({ children }) => {
       if (storedToken && storedUsername) {
         setUserToken(storedToken);
         setUsername(storedUsername);
-        // Set axios default header for all future requests
-        axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+        // Set axios instance default header
+        api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
       }
     } catch (error) {
       console.error('Error loading auth info:', error);
@@ -36,7 +45,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (inputUsername, password) => {
     try {
-      const response = await axios.post(`${API_URL}/login`, {
+      const response = await api.post('/login', {
         username: inputUsername,
         password
       });
@@ -51,8 +60,8 @@ export const AuthProvider = ({ children }) => {
       setUserToken(token);
       setUsername(inputUsername);
 
-      // Set axios default header for all future requests
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      // Set axios instance default header
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
       return { success: true };
     } catch (error) {
@@ -73,8 +82,8 @@ export const AuthProvider = ({ children }) => {
       setUserToken(null);
       setUsername(null);
 
-      // Clear axios default header
-      delete axios.defaults.headers.common['Authorization'];
+      // Clear axios instance default header
+      delete api.defaults.headers.common['Authorization'];
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -86,7 +95,8 @@ export const AuthProvider = ({ children }) => {
       userToken,
       username,
       login,
-      logout
+      logout,
+      api // Expose the configured axios instance
     }}>
       {children}
     </AuthContext.Provider>

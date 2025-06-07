@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 import Dropdown from '../components/Dropdown';
 
-const API_URL = 'https://4edu.su/api';
-
 const CreateGroupScreen = ({ navigation }) => {
+  const { api } = useAuth();
   const [name, setName] = useState('');
   const [academicGroupId, setAcademicGroupId] = useState(null);
   const [academicGroups, setAcademicGroups] = useState([]);
@@ -19,11 +18,15 @@ const CreateGroupScreen = ({ navigation }) => {
 
   const fetchAcademicGroups = async () => {
     try {
-      const response = await axios.get(`${API_URL}/academic-groups`);
+      const response = await api.get('/api/academic-groups');
       setAcademicGroups(response.data);
     } catch (error) {
       console.error('Error fetching academic groups:', error);
-      Alert.alert('Error', 'Failed to load academic groups');
+      if (error.response?.status === 401) {
+        navigation.navigate('Login');
+      } else {
+        Alert.alert('Error', 'Failed to load academic groups');
+      }
     } finally {
       setIsFetching(false);
     }
@@ -37,7 +40,7 @@ const CreateGroupScreen = ({ navigation }) => {
 
     setIsLoading(true);
     try {
-      const response = await axios.post(`${API_URL}/groups`, {
+      await api.post('/api/groups', {
         name,
         academic_group_id: academicGroupId
       });
@@ -49,7 +52,11 @@ const CreateGroupScreen = ({ navigation }) => {
       });
     } catch (error) {
       console.error('Error creating group:', error);
-      Alert.alert('Error', error.response?.data?.message || 'Failed to create group');
+      if (error.response?.status === 401) {
+        navigation.navigate('Login');
+      } else {
+        Alert.alert('Error', error.response?.data?.message || 'Failed to create group');
+      }
     } finally {
       setIsLoading(false);
     }

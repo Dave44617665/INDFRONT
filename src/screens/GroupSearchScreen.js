@@ -11,12 +11,12 @@ import {
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
-const API_URL = 'https://4edu.su/api';
 const PAGE_SIZE = 10;
 
 const GroupSearchScreen = ({ navigation }) => {
+  const { api } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [groups, setGroups] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -37,13 +37,17 @@ const GroupSearchScreen = ({ navigation }) => {
         params.search = search;
       }
 
-      const response = await axios.get(`${API_URL}/groups/available`, { params });
+      const response = await api.get('/api/groups/available', { params });
       setGroups(response.data.groups);
       setTotalPages(response.data.pagination.pages);
       setCurrentPage(response.data.pagination.page);
     } catch (error) {
       console.error('Error fetching groups:', error);
-      Alert.alert('Error', 'Failed to load available groups');
+      if (error.response?.status === 401) {
+        navigation.navigate('Login');
+      } else {
+        Alert.alert('Error', 'Failed to load available groups');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -72,7 +76,7 @@ const GroupSearchScreen = ({ navigation }) => {
 
     setIsLoading(true);
     try {
-      const response = await axios.post(`${API_URL}/groups/applications`, {
+      await api.post('/api/groups/applications', {
         group_id: selectedGroup.id,
         message: joinMessage.trim()
       });
@@ -83,7 +87,11 @@ const GroupSearchScreen = ({ navigation }) => {
       setSelectedGroup(null);
     } catch (error) {
       console.error('Error sending application:', error);
-      Alert.alert('Error', error.response?.data?.message || 'Failed to send application');
+      if (error.response?.status === 401) {
+        navigation.navigate('Login');
+      } else {
+        Alert.alert('Error', error.response?.data?.message || 'Failed to send application');
+      }
     } finally {
       setIsLoading(false);
     }

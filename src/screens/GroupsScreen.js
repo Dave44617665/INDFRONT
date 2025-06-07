@@ -1,16 +1,14 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
 import { useAuth } from '../context/AuthContext'; 
 
-const API_URL = 'https://4edu.su/api';
-
 const GroupsScreen = ({ navigation }) => {
-  const { userToken } = useAuth();
+  const { userToken, api } = useAuth();
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [hasError, setHasError] = useState(false);
   const [pagination, setPagination] = useState({
     page: 1,
     pageSize: 10,
@@ -21,44 +19,50 @@ const GroupsScreen = ({ navigation }) => {
     if (loading || (!pagination.hasMore && !refresh)) return;
     if (!userToken) {
       console.log('No auth token available');
+      navigation.navigate('Login');
       return;
     }
 
     try {
       setLoading(true);
+      setHasError(false);
       
-      // Debug log
-      console.log('Fetching groups with token:', userToken);
-      console.log('Request URL:', `${API_URL}/groups/my-groups`);
-      
-      const response = await axios.get(`${API_URL}/groups/my-groups`, {
+      const response = await api.get('/api/groups/my-groups', {
         params: {
           page,
           page_size: pagination.pageSize
         }
       });
 
-      console.log('Response:', response.data);
+      // Handle null response
+      if (!response.data) {
+        setGroups([]);
+        setPagination(prev => ({
+          ...prev,
+          hasMore: false
+        }));
+        return;
+      }
 
       const { groups: newGroups, pagination: paginationData } = response.data;
       
-      setGroups(prevGroups => 
-        refresh ? newGroups : [...prevGroups, ...newGroups]
-      );
+      if (refresh) {
+        setGroups(newGroups || []);
+      } else {
+        setGroups(prevGroups => [...prevGroups, ...(newGroups || [])]);
+      }
       
       setPagination({
         page,
         pageSize: pagination.pageSize,
-        hasMore: page < paginationData.pages
+        hasMore: paginationData ? page < paginationData.pages : false
       });
     } catch (error) {
       console.error('Error fetching groups:', error);
-      console.error('Error details:', {
-        status: error.response?.status,
-        data: error.response?.data,
-        headers: error.response?.headers,
-        config: error.config
-      });
+      setHasError(true);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        navigation.navigate('Login');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -66,20 +70,33 @@ const GroupsScreen = ({ navigation }) => {
   };
 
   const handleLoadMore = () => {
-    if (!loading && pagination.hasMore) {
+    if (!loading && pagination.hasMore && !hasError) {
       fetchGroups(pagination.page + 1);
     }
   };
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    setPagination(prev => ({ ...prev, page: 1, hasMore: true }));
+    setPagination({
+      page: 1,
+      pageSize: 10,
+      hasMore: true
+    });
     fetchGroups(1, true);
-  }, []);
+  }, [userToken]); // Add userToken as dependency
 
-  React.useEffect(() => {
-    fetchGroups();
-  }, []);
+  // Initial fetch when screen mounts or token changes
+  useEffect(() => {
+    if (userToken) {
+      setPagination({
+        page: 1,
+        pageSize: 10,
+        hasMore: true
+      });
+      setGroups([]); // Clear existing groups
+      fetchGroups(1, true);
+    }
+  }, [userToken]);
 
   const renderGroup = ({ item }) => (
     <TouchableOpacity 
@@ -111,6 +128,21 @@ const GroupsScreen = ({ navigation }) => {
     );
   };
 
+  const renderError = () => {
+    if (!hasError) return null;
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Failed to load groups</Text>
+        <TouchableOpacity 
+          style={styles.retryButton}
+          onPress={handleRefresh}
+        >
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <TouchableOpacity 
@@ -131,25 +163,28 @@ const GroupsScreen = ({ navigation }) => {
 
       <Text style={styles.sectionTitle}>My Groups</Text>
       
-      <FlatList
-        data={groups}
-        renderItem={renderGroup}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.5}
-        refreshing={refreshing}
-        onRefresh={handleRefresh}
-        ListFooterComponent={renderFooter}
-        ListEmptyComponent={
-          !loading && (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No groups found</Text>
-            </View>
-          )
-        }
-      />
+      {hasError ? renderError() : (
+        <FlatList
+          data={groups}
+          renderItem={renderGroup}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          ListFooterComponent={renderFooter}
+          ListEmptyComponent={
+            !loading && (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No groups found</Text>
+                <Text style={styles.emptySubtext}>Join or create a group to get started</Text>
+              </View>
+            )
+          }
+        />
+      )}
     </View>
   );
 };
@@ -258,6 +293,33 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: '#71727A',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#FF3B30',
+    marginBottom: 12,
+  },
+  retryButton: {
+    backgroundColor: '#4B6BFB',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#71727A',
+    marginTop: 8,
   },
 });
 

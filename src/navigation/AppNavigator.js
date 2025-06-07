@@ -13,6 +13,7 @@ import CreateTaskScreen from '../screens/CreateTaskScreen';
 import GroupsScreen from '../screens/GroupsScreen';
 import GroupSearchScreen from '../screens/GroupSearchScreen';
 import CreateGroupScreen from '../screens/CreateGroupScreen';
+import GroupDetailsScreen from '../screens/GroupDetailsScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -94,6 +95,18 @@ const GroupsStack = () => (
     <Stack.Screen name="GroupsList" component={GroupsScreen} options={{ title: 'Groups' }} />
     <Stack.Screen name="GroupSearch" component={GroupSearchScreen} options={{ title: 'Search Groups' }} />
     <Stack.Screen name="CreateGroup" component={CreateGroupScreen} options={{ title: 'Create Group' }} />
+    <Stack.Screen 
+      name="GroupDetails" 
+      component={GroupDetailsScreen} 
+      options={({ route }) => ({ 
+        title: 'Group Details',
+        headerRight: () => (
+          <TouchableOpacity style={{ marginRight: 16 }}>
+            <Ionicons name="ellipsis-horizontal" size={24} color="#1A1C1E" />
+          </TouchableOpacity>
+        ),
+      })} 
+    />
   </Stack.Navigator>
 );
 

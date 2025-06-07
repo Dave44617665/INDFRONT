@@ -1,18 +1,17 @@
 import React from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
-
-// API endpoint
-const API_URL = 'https://4edu.su';
+import { useAuth } from '../context/AuthContext';
 
 const RegisterScreen = ({ navigation }) => {
+  const { api } = useAuth();
   const [username, setUsername] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
   const [showPassword, setShowPassword] = React.useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(false);
 
   const validatePasswords = () => {
     if (password !== confirmPassword) {
@@ -42,11 +41,7 @@ const RegisterScreen = ({ navigation }) => {
     }
 
     try {
-      console.log('Sending registration request with:', {
-        username,
-        email,
-        password: password.length // Just log length for security
-      });
+      setIsLoading(true);
 
       const requestData = {
         username: username.trim(),
@@ -54,20 +49,7 @@ const RegisterScreen = ({ navigation }) => {
         password: password
       };
 
-      const config = {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
-      };
-
-      const response = await axios.post(
-        `${API_URL}/register`,
-        requestData,
-        config
-      );
-
-      console.log('Registration response:', response.status);
+      const response = await api.post('/register', requestData);
 
       if (response.data) {
         Alert.alert('Success', 'Registration successful!', [
@@ -78,12 +60,7 @@ const RegisterScreen = ({ navigation }) => {
         ]);
       }
     } catch (error) {
-      console.error('Registration error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        headers: error.response?.headers
-      });
+      console.error('Registration error:', error);
 
       let errorMessage = 'Registration failed. ';
       if (error.response?.data?.message) {
@@ -95,6 +72,8 @@ const RegisterScreen = ({ navigation }) => {
       }
 
       Alert.alert('Registration Failed', errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
