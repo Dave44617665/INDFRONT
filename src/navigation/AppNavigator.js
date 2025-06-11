@@ -75,11 +75,6 @@ const TasksStack = () => (
       component={TaskDetailsScreen} 
       options={{ 
         title: 'Task Details',
-        headerRight: () => (
-          <TouchableOpacity style={{ marginRight: 16 }}>
-            <Ionicons name="ellipsis-horizontal" size={24} color="#1A1C1E" />
-          </TouchableOpacity>
-        ),
       }} 
     />
     <Stack.Screen 
@@ -100,11 +95,6 @@ const GroupsStack = () => (
       component={GroupDetailsScreen} 
       options={({ route }) => ({ 
         title: 'Group Details',
-        headerRight: () => (
-          <TouchableOpacity style={{ marginRight: 16 }}>
-            <Ionicons name="ellipsis-horizontal" size={24} color="#1A1C1E" />
-          </TouchableOpacity>
-        ),
       })} 
     />
   </Stack.Navigator>

@@ -32,8 +32,6 @@ const GroupDetailsScreen = ({ route, navigation }) => {
   const [error, setError] = useState(null);
   const [isUpdateModalVisible, setIsUpdateModalVisible] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
-  const [newAcademicGroupId, setNewAcademicGroupId] = useState(null);
-  const [academicGroups, setAcademicGroups] = useState([]);
   const [subjectsPagination, setSubjectsPagination] = useState({
     page: 1,
     pageSize: 10,
@@ -50,7 +48,6 @@ const GroupDetailsScreen = ({ route, navigation }) => {
 
   useEffect(() => {
     fetchGroupDetails();
-    fetchAcademicGroups();
   }, [groupId]);
 
   const fetchGroupDetails = async () => {
@@ -61,30 +58,12 @@ const GroupDetailsScreen = ({ route, navigation }) => {
       }
       setGroup(response.data);
       setNewGroupName(response.data.name);
-      setNewAcademicGroupId(response.data.academic_group_id);
       setError(null);
     } catch (error) {
       console.error('Error fetching group details:', error);
       handleError(error, "Failed to load group details");
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const fetchAcademicGroups = async () => {
-    try {
-      const response = await api.get('/api/academic-groups');
-      setAcademicGroups(response.data.map(group => ({
-        value: group.id,
-        label: group.name
-      })));
-    } catch (error) {
-      console.error('Error fetching academic groups:', error);
-      if (error.response?.status === 401) {
-        navigation.navigate('Login');
-      } else {
-        Alert.alert('Error', 'Failed to load academic groups');
-      }
     }
   };
 
@@ -227,8 +206,7 @@ const GroupDetailsScreen = ({ route, navigation }) => {
   const handleUpdateGroup = async () => {
     try {
       const response = await api.patch(`/api/groups/${groupId}`, {
-        name: newGroupName,
-        academic_group_id: newAcademicGroupId
+        name: newGroupName
       });
 
       setGroup(response.data);
@@ -522,25 +500,12 @@ const GroupDetailsScreen = ({ route, navigation }) => {
               />
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Academic Group</Text>
-              <Dropdown
-                label="Academic Group"
-                placeholder="Select academic group"
-                value={newAcademicGroupId}
-                items={academicGroups}
-                onChange={setNewAcademicGroupId}
-                disabled={isLoading}
-              />
-            </View>
-
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => {
                   setIsUpdateModalVisible(false);
                   setNewGroupName(group.name);
-                  setNewAcademicGroupId(group.academic_group_id);
                 }}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>

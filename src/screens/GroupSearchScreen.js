@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -20,15 +21,21 @@ const GroupSearchScreen = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [groups, setGroups] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [refreshing, setRefreshing] = useState(false);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    pageSize: PAGE_SIZE,
+    hasMore: true
+  });
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [joinMessage, setJoinMessage] = useState('');
   const [isModalVisible, setIsModalVisible] = useState(false);
 
-  const fetchGroups = async (page = 1, search = '') => {
-    setIsLoading(true);
+  const fetchGroups = async (page = 1, search = '', refresh = false) => {
+    if (isLoading || (!pagination.hasMore && !refresh)) return;
+
     try {
+      setIsLoading(true);
       const params = {
         page,
         page_size: PAGE_SIZE,
@@ -38,9 +45,35 @@ const GroupSearchScreen = ({ navigation }) => {
       }
 
       const response = await api.get('/api/groups/available', { params });
-      setGroups(response.data.groups);
-      setTotalPages(response.data.pagination.pages);
-      setCurrentPage(response.data.pagination.page);
+      
+      if (!response.data) {
+        setGroups([]);
+        setPagination(prev => ({
+          ...prev,
+          hasMore: false
+        }));
+        return;
+      }
+
+      const { groups: newGroups, pagination: paginationData } = response.data;
+
+      if (refresh || page === 1) {
+        // For refresh or first page, replace all groups
+        setGroups(newGroups || []);
+      } else {
+        // For pagination, append new groups while avoiding duplicates
+        setGroups(prevGroups => {
+          const existingIds = new Set(prevGroups.map(g => g.id));
+          const uniqueNewGroups = (newGroups || []).filter(g => !existingIds.has(g.id));
+          return [...prevGroups, ...uniqueNewGroups];
+        });
+      }
+
+      setPagination({
+        page,
+        pageSize: paginationData.page_size || PAGE_SIZE,
+        hasMore: paginationData ? page < paginationData.pages : false
+      });
     } catch (error) {
       console.error('Error fetching groups:', error);
       if (error.response?.status === 401) {
@@ -50,22 +83,37 @@ const GroupSearchScreen = ({ navigation }) => {
       }
     } finally {
       setIsLoading(false);
+      setRefreshing(false);
     }
   };
 
   useEffect(() => {
-    fetchGroups();
+    fetchGroups(1, '');
   }, []);
 
   const handleSearch = () => {
-    setCurrentPage(1);
-    fetchGroups(1, searchQuery);
+    setPagination({
+      page: 1,
+      pageSize: PAGE_SIZE,
+      hasMore: true
+    });
+    fetchGroups(1, searchQuery, true);
   };
 
   const handleLoadMore = () => {
-    if (currentPage < totalPages && !isLoading) {
-      fetchGroups(currentPage + 1, searchQuery);
+    if (!isLoading && pagination.hasMore) {
+      fetchGroups(pagination.page + 1, searchQuery);
     }
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    setPagination({
+      page: 1,
+      pageSize: PAGE_SIZE,
+      hasMore: true
+    });
+    fetchGroups(1, searchQuery, true);
   };
 
   const handleJoinRequest = async () => {
@@ -145,14 +193,28 @@ const GroupSearchScreen = ({ navigation }) => {
         keyExtractor={item => item.id.toString()}
         contentContainerStyle={styles.listContent}
         onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.1}
+        onEndReachedThreshold={0.5}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={["#4B6BFB"]}
+          />
+        }
         ListEmptyComponent={
           !isLoading && (
-            <Text style={styles.emptyText}>No groups found</Text>
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No groups found</Text>
+              {searchQuery ? (
+                <Text style={styles.emptySubtext}>Try a different search term</Text>
+              ) : (
+                <Text style={styles.emptySubtext}>Try searching for groups</Text>
+              )}
+            </View>
           )
         }
         ListFooterComponent={
-          isLoading && (
+          isLoading && !refreshing && (
             <ActivityIndicator 
               size="large" 
               color="#4B6BFB" 
@@ -285,11 +347,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
   emptyText: {
-    textAlign: 'center',
-    color: '#71727A',
     fontSize: 16,
-    marginTop: 32,
+    color: '#1A1C1E',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#71727A',
   },
   loader: {
     marginVertical: 16,

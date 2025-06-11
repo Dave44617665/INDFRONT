@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 
 const TaskDetailsScreen = ({ route, navigation }) => {
   const { taskId } = route.params;
-  const { api } = useAuth();
+  const { api, username } = useAuth();
   const [task, setTask] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -18,11 +18,24 @@ const TaskDetailsScreen = ({ route, navigation }) => {
   const fetchTaskDetails = async () => {
     try {
       const response = await api.get(`/api/tasks/${taskId}`);
+      console.log('Task Response:', response.data);
       setTask(response.data);
-      // Check if user is admin of the group
+
+      // Check if user is admin of the group or creator of the task
+      const isCreator = response.data.username === username;
+      console.log('Is Creator:', isCreator, 'Task Username:', response.data.username, 'Current Username:', username);
+
       if (response.data.group_id) {
         const groupResponse = await api.get(`/api/groups/${response.data.group_id}`);
-        setIsAdmin(groupResponse.data.is_admin);
+        console.log('Group Response:', groupResponse.data);
+        
+        // Set admin status based on the group response or creator status
+        const isGroupAdmin = groupResponse.data.admin_username === username;
+        console.log('Is Group Admin:', isGroupAdmin);
+        
+        setIsAdmin(isCreator || isGroupAdmin);
+      } else {
+        setIsAdmin(isCreator);
       }
       setError(null);
     } catch (err) {
@@ -35,6 +48,11 @@ const TaskDetailsScreen = ({ route, navigation }) => {
       setLoading(false);
     }
   };
+
+  // Add a useEffect to monitor isAdmin changes
+  useEffect(() => {
+    console.log('isAdmin state changed:', isAdmin);
+  }, [isAdmin]);
 
   const handleDelete = async () => {
     Alert.alert(
@@ -51,7 +69,8 @@ const TaskDetailsScreen = ({ route, navigation }) => {
           onPress: async () => {
             try {
               await api.delete(`/api/tasks/${taskId}`);
-              navigation.goBack();
+              // After successful deletion, navigate back and trigger a refresh
+              navigation.navigate('Tasks', { refresh: true });
             } catch (err) {
               console.error('Error deleting task:', err);
               Alert.alert('Error', 'Failed to delete task');
@@ -110,6 +129,20 @@ const TaskDetailsScreen = ({ route, navigation }) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Description</Text>
           <Text style={styles.description}>{task?.description || 'No description provided'}</Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Details</Text>
+          <View style={styles.detailsContainer}>
+            <View style={styles.detailItem}>
+              <Ionicons name="people-outline" size={20} color="#71727A" />
+              <Text style={styles.detailText}>Group: {task?.group?.name || 'No group'}</Text>
+            </View>
+            <View style={styles.detailItem}>
+              <Ionicons name="book-outline" size={20} color="#71727A" />
+              <Text style={styles.detailText}>Subject: {task?.subject?.name || 'No subject'}</Text>
+            </View>
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -185,6 +218,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#48484A',
     lineHeight: 24,
+  },
+  detailsContainer: {
+    gap: 12,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  detailText: {
+    fontSize: 14,
+    color: '#48484A',
   },
   dateContainer: {
     gap: 12,

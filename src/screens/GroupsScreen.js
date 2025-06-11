@@ -46,15 +46,21 @@ const GroupsScreen = ({ navigation }) => {
 
       const { groups: newGroups, pagination: paginationData } = response.data;
       
-      if (refresh) {
+      if (refresh || page === 1) {
+        // For refresh or first page, replace all groups
         setGroups(newGroups || []);
       } else {
-        setGroups(prevGroups => [...prevGroups, ...(newGroups || [])]);
+        // For pagination, append new groups while avoiding duplicates
+        setGroups(prevGroups => {
+          const existingIds = new Set(prevGroups.map(g => g.id));
+          const uniqueNewGroups = (newGroups || []).filter(g => !existingIds.has(g.id));
+          return [...prevGroups, ...uniqueNewGroups];
+        });
       }
       
       setPagination({
         page,
-        pageSize: pagination.pageSize,
+        pageSize: paginationData.page_size || pagination.pageSize,
         hasMore: paginationData ? page < paginationData.pages : false
       });
     } catch (error) {
@@ -83,7 +89,7 @@ const GroupsScreen = ({ navigation }) => {
       hasMore: true
     });
     fetchGroups(1, true);
-  }, [userToken]); // Add userToken as dependency
+  }, []);
 
   // Initial fetch when screen mounts or token changes
   useEffect(() => {
