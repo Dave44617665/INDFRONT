@@ -123,25 +123,33 @@ const TasksScreen = ({ navigation }) => {
       )}
 
       <View style={styles.taskDetails}>
-        <View style={styles.detailItem}>
-          <Ionicons name="people" size={16} color="#71727A" />
-          <Text style={styles.detailText}>{item.group.name}</Text>
-        </View>
-        <View style={styles.detailItem}>
-          <Ionicons name="book" size={16} color="#71727A" />
-          <Text style={styles.detailText}>{item.subject.name}</Text>
-        </View>
-        <View style={styles.detailItem}>
-          <Ionicons name="school" size={16} color="#71727A" />
-          <Text style={styles.detailText}>{item.academic_group.name}</Text>
-        </View>
+        {item.group && (
+          <View style={styles.detailItem}>
+            <Ionicons name="people" size={16} color="#71727A" />
+            <Text style={styles.detailText}>{item.group.name}</Text>
+          </View>
+        )}
+        {item.subject && (
+          <View style={styles.detailItem}>
+            <Ionicons name="book" size={16} color="#71727A" />
+            <Text style={styles.detailText}>{item.subject.name}</Text>
+          </View>
+        )}
+        {item.academic_group && (
+          <View style={styles.detailItem}>
+            <Ionicons name="school" size={16} color="#71727A" />
+            <Text style={styles.detailText}>{item.academic_group.name}</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.taskFooter}>
-        <View style={styles.userInfo}>
-          <Ionicons name="person" size={16} color="#4B6BFB" />
-          <Text style={styles.username}>{item.user.username}</Text>
-        </View>
+        {item.user && (
+          <View style={styles.userInfo}>
+            <Ionicons name="person" size={16} color="#4B6BFB" />
+            <Text style={styles.username}>{item.user.username}</Text>
+          </View>
+        )}
         <Text style={styles.taskDate}>
           Created: {formatDate(item.created_at)}
         </Text>
