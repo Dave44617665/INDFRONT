@@ -85,10 +85,7 @@ const SubjectsScreen = ({ navigation }) => {
   };
 
   const renderSubject = ({ item }) => (
-    <TouchableOpacity
-      style={styles.subjectCard}
-      onPress={() => navigation.navigate('SubjectDetails', { subjectId: item.id })}
-    >
+    <View style={styles.subjectCard}>
       <View style={styles.subjectHeader}>
         <View style={styles.subjectIcon}>
           <Ionicons name="book" size={24} color="#4B6BFB" />
@@ -113,7 +110,7 @@ const SubjectsScreen = ({ navigation }) => {
           </TouchableOpacity>
         ))}
       </View>
-    </TouchableOpacity>
+    </View>
   );
 
   if (error) {

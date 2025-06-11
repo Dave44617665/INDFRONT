@@ -1,101 +1,144 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../context/AuthContext';
 
 const TaskDetailsScreen = ({ route, navigation }) => {
-  const { task } = route.params;
-  const [isEditing, setIsEditing] = React.useState(false);
+  const { taskId } = route.params;
+  const { api } = useAuth();
+  const [task, setTask] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Overdue':
-        return '#FF3B30';
-      case 'Due Today':
-        return '#FF9500';
-      case 'Completed':
-        return '#34C759';
-      default:
-        return '#007AFF';
+  useEffect(() => {
+    fetchTaskDetails();
+  }, [taskId]);
+
+  const fetchTaskDetails = async () => {
+    try {
+      const response = await api.get(`/api/tasks/${taskId}`);
+      setTask(response.data);
+      // Check if user is admin of the group
+      if (response.data.group_id) {
+        const groupResponse = await api.get(`/api/groups/${response.data.group_id}`);
+        setIsAdmin(groupResponse.data.is_admin);
+      }
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching task details:', err);
+      setError('Failed to load task details');
+      if (err.response?.status === 401) {
+        navigation.navigate('Login');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
+  const handleDelete = async () => {
+    Alert.alert(
+      'Delete Task',
+      'Are you sure you want to delete this task? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.delete(`/api/tasks/${taskId}`);
+              navigation.goBack();
+            } catch (err) {
+              console.error('Error deleting task:', err);
+              Alert.alert('Error', 'Failed to delete task');
+              if (err.response?.status === 401) {
+                navigation.navigate('Login');
+              }
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color="#4B6BFB" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Ionicons name="alert-circle-outline" size={48} color="#FF3B30" />
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={fetchTaskDetails}
+        >
+          <Text style={styles.retryButtonText}>Try Again</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.titleContainer}>
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollContent}>
+        <View style={styles.header}>
           <Text style={styles.title}>{task?.title}</Text>
+          <Text style={styles.username}>Created by: {task?.username}</Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Description</Text>
+          <Text style={styles.description}>{task?.description || 'No description provided'}</Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Deadlines</Text>
+          <View style={styles.dateContainer}>
+            <View style={styles.dateItem}>
+              <Ionicons name="calendar-outline" size={20} color="#71727A" />
+              <Text style={styles.dateText}>Created: {formatDate(task?.created_at)}</Text>
+            </View>
+            <View style={styles.dateItem}>
+              <Ionicons name="time-outline" size={20} color="#71727A" />
+              <Text style={styles.dateText}>Due: {formatDate(task?.deadline)}</Text>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+
+      {isAdmin && (
+        <View style={styles.deleteButtonContainer}>
           <TouchableOpacity
-            style={styles.editButton}
-            onPress={() => setIsEditing(true)}
+            style={styles.deleteButton}
+            onPress={handleDelete}
           >
-            <Ionicons name="pencil" size={20} color="#4B6BFB" />
+            <Ionicons name="trash-outline" size={20} color="#FFFFFF" />
+            <Text style={styles.deleteButtonText}>Delete Task</Text>
           </TouchableOpacity>
         </View>
-        <Text style={[styles.status, { color: getStatusColor(task?.status) }]}>
-          {task?.status}
-        </Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Description</Text>
-        <Text style={styles.description}>{task?.description}</Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Due Date</Text>
-        <View style={styles.metaItem}>
-          <Ionicons name="calendar-outline" size={20} color="#71727A" />
-          <Text style={styles.metaText}>{task?.dueDate}</Text>
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Subject</Text>
-        <View style={styles.subjectContainer}>
-          <View style={[styles.subjectIcon, { backgroundColor: task?.subject?.iconBg }]}>
-            <Ionicons name={task?.subject?.icon} size={20} color="#FFF" />
-          </View>
-          <Text style={styles.subjectName}>{task?.subject?.name}</Text>
-        </View>
-      </View>
-
-      {task?.attachments && task.attachments.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Attachments</Text>
-          {task.attachments.map((attachment, index) => (
-            <TouchableOpacity key={index} style={styles.attachmentItem}>
-              <Ionicons name="document-outline" size={20} color="#71727A" />
-              <Text style={styles.attachmentName}>{attachment.name}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
       )}
-
-      <View style={styles.actionButtons}>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.completeButton]}
-          onPress={() => {
-            // Handle task completion
-          }}
-        >
-          <Ionicons name="checkmark-circle" size={20} color="#FFF" />
-          <Text style={styles.actionButtonText}>Mark as Complete</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.actionButton, styles.deleteButton]}
-          onPress={() => {
-            // Handle task deletion
-            navigation.goBack();
-          }}
-        >
-          <Ionicons name="trash" size={20} color="#FF3B30" />
-          <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
-            Delete Task
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+    </View>
   );
 };
 
@@ -104,30 +147,28 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8F9FB',
   },
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scrollContent: {
+    flex: 1,
+  },
   header: {
     padding: 16,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5EA',
   },
-  titleContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#1A1C1E',
-    flex: 1,
+    marginBottom: 8,
   },
-  editButton: {
-    padding: 8,
-  },
-  status: {
-    fontSize: 16,
-    fontWeight: '500',
+  username: {
+    fontSize: 14,
+    color: '#71727A',
   },
   section: {
     padding: 16,
@@ -138,73 +179,62 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#1A1C1E',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   description: {
     fontSize: 16,
     color: '#48484A',
     lineHeight: 24,
   },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  metaText: {
-    marginLeft: 8,
-    fontSize: 16,
-    color: '#48484A',
-  },
-  subjectContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  subjectIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  subjectName: {
-    fontSize: 16,
-    color: '#48484A',
-  },
-  attachmentItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  attachmentName: {
-    marginLeft: 8,
-    fontSize: 16,
-    color: '#48484A',
-  },
-  actionButtons: {
-    padding: 16,
+  dateContainer: {
     gap: 12,
   },
-  actionButton: {
+  dateItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dateText: {
+    fontSize: 14,
+    color: '#48484A',
+  },
+  deleteButtonContainer: {
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5EA',
+  },
+  deleteButton: {
+    backgroundColor: '#FF3B30',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
     borderRadius: 12,
-  },
-  completeButton: {
-    backgroundColor: '#4B6BFB',
-  },
-  deleteButton: {
-    backgroundColor: '#FF3B3020',
-  },
-  actionButtonText: {
-    marginLeft: 8,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    gap: 8,
   },
   deleteButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  errorText: {
+    fontSize: 16,
     color: '#FF3B30',
+    marginTop: 8,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#4B6BFB',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

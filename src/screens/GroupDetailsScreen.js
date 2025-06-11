@@ -74,10 +74,17 @@ const GroupDetailsScreen = ({ route, navigation }) => {
   const fetchAcademicGroups = async () => {
     try {
       const response = await api.get('/api/academic-groups');
-      setAcademicGroups(response.data);
+      setAcademicGroups(response.data.map(group => ({
+        value: group.id,
+        label: group.name
+      })));
     } catch (error) {
       console.error('Error fetching academic groups:', error);
-      handleError(error, "Failed to load academic groups");
+      if (error.response?.status === 401) {
+        navigation.navigate('Login');
+      } else {
+        Alert.alert('Error', 'Failed to load academic groups');
+      }
     }
   };
 
@@ -460,14 +467,6 @@ const GroupDetailsScreen = ({ route, navigation }) => {
                   <View style={styles.emptyStateContainer}>
                     <Ionicons name="clipboard-outline" size={48} color="#71727A" />
                     <Text style={styles.emptyText}>There are no tasks in this group yet</Text>
-                    {isAdmin && (
-                      <TouchableOpacity
-                        style={styles.createTaskButton}
-                        onPress={() => navigation.navigate('CreateTask', { groupId })}
-                      >
-                        <Text style={styles.createTaskButtonText}>Create Task</Text>
-                      </TouchableOpacity>
-                    )}
                   </View>
                 }
                 ListFooterComponent={
@@ -526,10 +525,12 @@ const GroupDetailsScreen = ({ route, navigation }) => {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Academic Group</Text>
               <Dropdown
+                label="Academic Group"
+                placeholder="Select academic group"
                 value={newAcademicGroupId}
                 items={academicGroups}
-                onSelect={(item) => setNewAcademicGroupId(item.id)}
-                placeholder="Select academic group"
+                onChange={setNewAcademicGroupId}
+                disabled={isLoading}
               />
             </View>
 
@@ -869,17 +870,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
-  },
-  createTaskButton: {
-    backgroundColor: '#4B6BFB',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  createTaskButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
   },
 });
 

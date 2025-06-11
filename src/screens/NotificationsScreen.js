@@ -1,65 +1,183 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  RefreshControl
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../context/AuthContext';
 
-const NotificationsScreen = () => {
-  // This would come from your backend
-  const [notifications, setNotifications] = React.useState([]);
+const NotificationsScreen = ({ navigation }) => {
+  const { api } = useAuth();
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
 
-  React.useEffect(() => {
-    // Fetch notifications from backend
-  }, []);
+  const fetchNotifications = async (showRefreshing = false) => {
+    if (showRefreshing) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
 
-  const getNotificationIcon = (type) => {
-    switch (type) {
-      case 'new_material':
-        return { name: 'document-text', color: '#4B6BFB', bg: '#4B6BFB20' };
-      case 'assignment_complete':
-        return { name: 'checkmark-circle', color: '#34C759', bg: '#34C75920' };
-      case 'reminder':
-        return { name: 'calendar', color: '#9747FF', bg: '#9747FF20' };
-      case 'reply':
-        return { name: 'chatbubble', color: '#FF9500', bg: '#FF950020' };
-      case 'deadline':
-        return { name: 'alert-circle', color: '#FF3B30', bg: '#FF3B3020' };
-      default:
-        return { name: 'notifications', color: '#71727A', bg: '#71727A20' };
+    try {
+      const response = await api.get('/api/groups/applications/pending');
+      setNotifications(response.data);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+      setError(
+        err.response?.status === 401
+          ? 'Please log in again'
+          : 'Failed to load notifications'
+      );
+      if (err.response?.status === 401) {
+        navigation.navigate('Login');
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const renderNotification = ({ item }) => {
-    const icon = getNotificationIcon(item.type);
-    
-    return (
-      <TouchableOpacity style={styles.notificationCard}>
-        <View style={[styles.iconContainer, { backgroundColor: icon.bg }]}>
-          <Ionicons name={icon.name} size={24} color={icon.color} />
-        </View>
-        <View style={styles.contentContainer}>
-          <View style={styles.headerContainer}>
-            <Text style={styles.groupName}>{item.groupName}</Text>
-            <Text style={styles.time}>{item.time}</Text>
-          </View>
-          <Text style={styles.message}>{item.message}</Text>
-          {item.actionLabel && (
-            <Text style={[styles.actionLabel, { color: icon.color }]}>
-              {item.actionLabel}
-            </Text>
-          )}
-        </View>
-      </TouchableOpacity>
-    );
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  const handleApplicationReview = async (groupId, username, status) => {
+    try {
+      await api.patch(`/api/groups/applications/review/${groupId}`, {
+        status,
+        username
+      });
+      
+      // Remove the reviewed application from the list
+      setNotifications(prev => 
+        prev.filter(notification => 
+          !(notification.group_id === groupId && notification.username === username)
+        )
+      );
+
+      Alert.alert(
+        'Success',
+        `Application ${status.toLowerCase()} successfully`
+      );
+    } catch (err) {
+      console.error('Error reviewing application:', err);
+      Alert.alert(
+        'Error',
+        err.response?.status === 401
+          ? 'Please log in again'
+          : 'Failed to review application'
+      );
+      if (err.response?.status === 401) {
+        navigation.navigate('Login');
+      }
+    }
   };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now - date);
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
+    const diffMinutes = Math.floor(diffTime / (1000 * 60));
+
+    if (diffDays > 0) {
+      return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    } else if (diffHours > 0) {
+      return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    } else if (diffMinutes > 0) {
+      return `${diffMinutes} minute${diffMinutes > 1 ? 's' : ''} ago`;
+    } else {
+      return 'Just now';
+    }
+  };
+
+  const renderNotification = ({ item }) => (
+    <View style={styles.notificationCard}>
+      <View style={styles.notificationHeader}>
+        <View style={styles.userInfo}>
+          <View style={styles.userIcon}>
+            <Ionicons name="person" size={20} color="#4B6BFB" />
+          </View>
+          <Text style={styles.username}>{item.username}</Text>
+        </View>
+        <Text style={styles.timestamp}>{formatDate(item.created_at)}</Text>
+      </View>
+
+      <Text style={styles.message}>{item.message}</Text>
+
+      <View style={styles.actionButtons}>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.approveButton]}
+          onPress={() => handleApplicationReview(item.group_id, item.username, 'approved')}
+        >
+          <Ionicons name="checkmark" size={20} color="#FFFFFF" />
+          <Text style={styles.actionButtonText}>Approve</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.actionButton, styles.rejectButton]}
+          onPress={() => handleApplicationReview(item.group_id, item.username, 'rejected')}
+        >
+          <Ionicons name="close" size={20} color="#FFFFFF" />
+          <Text style={styles.actionButtonText}>Reject</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  if (loading && !refreshing) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <ActivityIndicator size="large" color="#4B6BFB" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <Ionicons name="alert-circle-outline" size={48} color="#FF3B30" />
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => fetchNotifications()}
+        >
+          <Text style={styles.retryButtonText}>Try Again</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-
       <FlatList
         data={notifications}
         renderItem={renderNotification}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
+        keyExtractor={(item) => `${item.group_id}-${item.user_id}-${item.created_at}`}
+        contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => fetchNotifications(true)}
+            colors={["#4B6BFB"]}
+          />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="notifications-outline" size={48} color="#71727A" />
+            <Text style={styles.emptyText}>No pending applications</Text>
+          </View>
+        }
       />
     </View>
   );
@@ -70,11 +188,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8F9FB',
   },
-  listContainer: {
+  centerContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  listContent: {
     padding: 16,
   },
   notificationCard: {
-    flexDirection: 'row',
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
@@ -85,40 +206,91 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  contentContainer: {
-    flex: 1,
-  },
-  headerContainer: {
+  notificationHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 12,
   },
-  groupName: {
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  userIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#4B6BFB20',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  username: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1A1C1E',
   },
-  time: {
+  timestamp: {
     fontSize: 12,
     color: '#71727A',
   },
   message: {
     fontSize: 14,
     color: '#48484A',
-    marginBottom: 4,
+    lineHeight: 20,
+    marginBottom: 16,
   },
-  actionLabel: {
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  approveButton: {
+    backgroundColor: '#34C759',
+  },
+  rejectButton: {
+    backgroundColor: '#FF3B30',
+  },
+  actionButtonText: {
+    color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 32,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#71727A',
+    marginTop: 8,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#FF3B30',
+    marginTop: 8,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#4B6BFB',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

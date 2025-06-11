@@ -14,29 +14,29 @@ const Dropdown = ({
   label, 
   placeholder, 
   value, 
-  items, 
-  onSelect,
+  items = [], 
+  onChange,
   disabled = false,
 }) => {
   const [visible, setVisible] = useState(false);
 
-  const selectedItem = items.find(item => item.id === value);
+  const selectedItem = items.find(item => item.value === value);
 
   const renderItem = ({ item }) => (
     <TouchableOpacity
       style={styles.item}
       onPress={() => {
-        onSelect(item);
+        onChange(item.value);
         setVisible(false);
       }}
     >
       <Text style={[
         styles.itemText,
-        item.id === value && styles.selectedItemText
+        item.value === value && styles.selectedItemText
       ]}>
-        {item.name}
+        {item.label}
       </Text>
-      {item.id === value && (
+      {item.value === value && (
         <Ionicons name="checkmark" size={20} color="#4B6BFB" />
       )}
     </TouchableOpacity>
@@ -57,7 +57,7 @@ const Dropdown = ({
           styles.buttonText,
           !selectedItem && styles.placeholderText
         ]}>
-          {selectedItem ? selectedItem.name : placeholder}
+          {selectedItem ? selectedItem.label : placeholder}
         </Text>
         <Ionicons 
           name="chevron-down" 
@@ -77,7 +77,7 @@ const Dropdown = ({
             <TouchableWithoutFeedback>
               <View style={styles.modalContent}>
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>{label}</Text>
+                  <Text style={styles.modalTitle}>{label || 'Select an option'}</Text>
                   <TouchableOpacity 
                     onPress={() => setVisible(false)}
                     style={styles.closeButton}
@@ -88,8 +88,11 @@ const Dropdown = ({
                 <FlatList
                   data={items}
                   renderItem={renderItem}
-                  keyExtractor={item => item.id.toString()}
+                  keyExtractor={item => String(item.value)}
                   showsVerticalScrollIndicator={false}
+                  ListEmptyComponent={
+                    <Text style={styles.emptyText}>No options available</Text>
+                  }
                 />
               </View>
             </TouchableWithoutFeedback>
@@ -173,6 +176,12 @@ const styles = StyleSheet.create({
   selectedItemText: {
     color: '#4B6BFB',
     fontWeight: '600',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#71727A',
+    textAlign: 'center',
+    padding: 16,
   },
 });
 

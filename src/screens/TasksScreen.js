@@ -74,6 +74,23 @@ const TasksScreen = ({ navigation }) => {
     fetchTasks(1);
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      // Check if we need to refresh the tasks
+      const refresh = navigation.getState()?.routes?.find(
+        route => route.name === 'Tasks'
+      )?.params?.refresh;
+
+      if (refresh) {
+        fetchTasks(1);
+        // Reset the refresh parameter
+        navigation.setParams({ refresh: false });
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
   const handleLoadMore = () => {
     if (!isLoading && pagination.hasMore) {
       fetchTasks(pagination.page + 1);
@@ -204,6 +221,12 @@ const TasksScreen = ({ navigation }) => {
           ) : null
         }
       />
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => navigation.navigate('CreateTask')}
+      >
+        <Ionicons name="add" size={24} color="#FFFFFF" />
+      </TouchableOpacity>
     </View>
   );
 };
@@ -335,6 +358,22 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  fab: {
+    position: 'absolute',
+    right: 16,
+    bottom: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#4B6BFB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
 });
 

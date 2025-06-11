@@ -19,7 +19,10 @@ const CreateGroupScreen = ({ navigation }) => {
   const fetchAcademicGroups = async () => {
     try {
       const response = await api.get('/api/academic-groups');
-      setAcademicGroups(response.data);
+      setAcademicGroups(response.data.map(group => ({
+        value: group.id,
+        label: group.name
+      })));
     } catch (error) {
       console.error('Error fetching academic groups:', error);
       if (error.response?.status === 401) {
@@ -89,7 +92,7 @@ const CreateGroupScreen = ({ navigation }) => {
           placeholder="Select academic group"
           value={academicGroupId}
           items={academicGroups}
-          onSelect={(item) => setAcademicGroupId(item.id)}
+          onChange={setAcademicGroupId}
           disabled={isLoading}
         />
 
