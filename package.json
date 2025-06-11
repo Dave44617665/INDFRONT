@@ -23,6 +23,8 @@
     "@react-navigation/stack": "^7.3.2",
     "axios": "^1.9.0",
     "expo": "^53.0.9",
+    "lodash": "^4.17.21",
+    "lodash.debounce": "^4.0.8",
     "metro": "^0.82.4",
     "metro-core": "^0.82.4",
     "metro-runtime": "^0.82.4",

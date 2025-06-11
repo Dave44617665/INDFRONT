@@ -104,7 +104,10 @@ const SubjectsScreen = ({ navigation }) => {
           <TouchableOpacity
             key={group.id}
             style={styles.groupChip}
-            onPress={() => navigation.navigate('GroupDetails', { groupId: group.id })}
+            onPress={() => navigation.navigate('Groups', { 
+              screen: 'GroupDetails',
+              params: { groupId: group.id }
+            })}
           >
             <Text style={styles.groupChipText}>{group.name}</Text>
           </TouchableOpacity>

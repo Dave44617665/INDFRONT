@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,8 +13,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import debounce from 'lodash/debounce';
 
 const PAGE_SIZE = 10;
+const SEARCH_DELAY = 300; // milliseconds
 
 const GroupSearchScreen = ({ navigation }) => {
   const { api } = useAuth();
@@ -41,7 +43,7 @@ const GroupSearchScreen = ({ navigation }) => {
         page_size: PAGE_SIZE,
       };
       if (search) {
-        params.search = search;
+        params.name = search;
       }
 
       const response = await api.get('/api/groups/available', { params });
@@ -87,18 +89,33 @@ const GroupSearchScreen = ({ navigation }) => {
     }
   };
 
-  useEffect(() => {
-    fetchGroups(1, '');
-  }, []);
+  // Create a debounced version of fetchGroups for search
+  const debouncedSearch = useCallback(
+    debounce((query) => {
+      setPagination({
+        page: 1,
+        pageSize: PAGE_SIZE,
+        hasMore: true
+      });
+      fetchGroups(1, query, true);
+    }, SEARCH_DELAY),
+    []
+  );
 
-  const handleSearch = () => {
-    setPagination({
-      page: 1,
-      pageSize: PAGE_SIZE,
-      hasMore: true
-    });
-    fetchGroups(1, searchQuery, true);
-  };
+  // Effect to trigger search when query changes
+  useEffect(() => {
+    if (searchQuery.trim() !== '') {
+      debouncedSearch(searchQuery);
+    } else {
+      // If search is empty, show all available groups
+      setPagination({
+        page: 1,
+        pageSize: PAGE_SIZE,
+        hasMore: true
+      });
+      fetchGroups(1, '', true);
+    }
+  }, [searchQuery]);
 
   const handleLoadMore = () => {
     if (!isLoading && pagination.hasMore) {
@@ -177,14 +194,12 @@ const GroupSearchScreen = ({ navigation }) => {
           onChangeText={setSearchQuery}
           placeholder="Search groups by name"
           returnKeyType="search"
-          onSubmitEditing={handleSearch}
+          autoCapitalize="none"
+          autoCorrect={false}
         />
-        <TouchableOpacity 
-          style={styles.searchButton}
-          onPress={handleSearch}
-        >
-          <Ionicons name="search" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
+        <View style={styles.searchIcon}>
+          <Ionicons name="search" size={24} color="#71727A" />
+        </View>
       </View>
 
       <FlatList
@@ -289,6 +304,7 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
     padding: 16,
     gap: 12,
   },
@@ -299,14 +315,13 @@ const styles = StyleSheet.create({
     borderColor: '#E5E5EA',
     borderRadius: 12,
     padding: 12,
+    paddingRight: 40,
     fontSize: 16,
   },
-  searchButton: {
-    backgroundColor: '#4B6BFB',
-    borderRadius: 12,
-    width: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
+  searchIcon: {
+    position: 'absolute',
+    right: 28,
+    top: 28,
   },
   listContent: {
     padding: 16,
@@ -317,16 +332,17 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
   groupInfo: {
     flex: 1,
   },
   groupName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#1A1C1E',
     marginBottom: 4,
@@ -334,16 +350,17 @@ const styles = StyleSheet.create({
   groupDetails: {
     fontSize: 14,
     color: '#71727A',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   joinButton: {
-    backgroundColor: '#4B6BFB20',
+    backgroundColor: '#4B6BFB',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
+    justifyContent: 'center',
   },
   joinButtonText: {
-    color: '#4B6BFB',
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -362,7 +379,7 @@ const styles = StyleSheet.create({
     color: '#71727A',
   },
   loader: {
-    marginVertical: 16,
+    marginTop: 16,
   },
   modalOverlay: {
     flex: 1,
@@ -373,12 +390,13 @@ const styles = StyleSheet.create({
   modalContent: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 16,
+    padding: 24,
     width: '90%',
+    maxWidth: 400,
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#1A1C1E',
     marginBottom: 8,
   },
@@ -396,23 +414,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     minHeight: 100,
     textAlignVertical: 'top',
-    marginBottom: 16,
   },
   modalButtons: {
     flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 24,
     gap: 12,
   },
   modalButton: {
-    flex: 1,
-    borderRadius: 12,
-    padding: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minWidth: 100,
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: '#FF3B3020',
+    backgroundColor: '#F8F9FB',
   },
   cancelButtonText: {
-    color: '#FF3B30',
+    color: '#71727A',
     fontSize: 16,
     fontWeight: '600',
   },
